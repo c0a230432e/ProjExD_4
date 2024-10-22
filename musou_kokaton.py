@@ -121,10 +121,6 @@ class Bird(pg.sprite.Sprite):
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
-                if key_lst[pg.K_LSHIFT]:
-                    self.speed = 20
-                else:
-                    self.speed = 10
         self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
         if check_bound(self.rect) != (True, True):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
@@ -181,14 +177,16 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird,angle0:float=0):  # angleのパラメータを追加
         """
         ビーム画像Surfaceを生成する
-        引数 bird：ビームを放つこうかとん
+        引数1 bird：ビームを放つこうかとん
+        引数2 angle0：追加の回転角度　（デフォルト：0）
         """
         super().__init__()
         self.vx, self.vy = bird.dire
         angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle += angle0  # 追加の回転角度を適用
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 2.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
@@ -206,6 +204,33 @@ class Beam(pg.sprite.Sprite):
         if check_bound(self.rect) != (True, True):
             self.kill()
 
+
+class NeoBeam:
+    """
+    複数方向ビームに関するクラス
+    """
+    def __init__(self, bird: Bird, num: int):
+        """
+        引数1 bird：ビームを放つこうかとん
+        引数2 num：ビームの数
+        """
+        self.bird = bird
+        self.num = num
+    
+    def gen_beams(self) -> list[Beam]:
+        """
+        複数方向のビームを生成する
+        戻り値：Beamインスタンスのリスト
+        """
+        beams = []
+        angle_range = 100  # -50度から+50度
+        angle_step = angle_range / (self.num - 1) if self.num > 1 else 0
+        
+        for i in range(self.num):
+            angle = -50 + (i * angle_step)  # -50度から+50度までの角度を計算
+            beams.append(Beam(self.bird, angle))
+        
+        return beams
 
 class Explosion(pg.sprite.Sprite):
     """
@@ -282,25 +307,6 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
-class EMP:
-    """
-    電磁パルスに関するクラス
-    """
-    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.surface):
-        for emy in emys:
-            emy.interval = float('inf')
-            emy.image = pg.transform.laplacian(emy.image)
-        for bomb in bombs:
-            bomb.speed = 3
-            bomb.state = "inactive"
-        self.image = pg.Surface((WIDTH, HEIGHT))
-        pg.draw.rect(self.image, (255, 255, 0), (0, 0, WIDTH, HEIGHT))
-        self.image.set_alpha(50)
-        screen.blit(self.image, [0, 0])
-        pg.display.update()
-        time.sleep(0.5)
-
-
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -326,7 +332,13 @@ def main():
                 score.value -= 200  # スコアを消費
 
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                if key_lst[pg.K_LSHIFT]:  # 左シフトキーが押されている場合
+                    # 複数方向ビームを発射
+                    neo_beam = NeoBeam(bird, 5)  # 5本のビームを発射
+                    beams.add(*neo_beam.gen_beams())
+                else:
+                    # 通常の単発ビーム
+                    beams.add(Beam(bird))
             if score.value >= 20 and score.value > 0:
                 if event.type == pg.KEYDOWN and event.key == pg.K_e:
                     score.value -= 20
