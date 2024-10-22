@@ -121,12 +121,18 @@ class Bird(pg.sprite.Sprite):
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
+                if key_lst[pg.K_LSHIFT]:
+                    self.speed = 20
+                else:
+                    self.speed = 10
         self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
         if check_bound(self.rect) != (True, True):
             self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
+            if self.state == "hyper":
+                self.image = pg.transform.laplacian(self.image)
         screen.blit(self.image, self.rect)
 
         # 追加: 無敵状態の処理
@@ -307,6 +313,26 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+class EMP:
+    """
+    電磁パルスに関するクラス
+    """
+    def __init__(self, emys: pg.sprite.Group, bombs: pg.sprite.Group, screen: pg.surface):
+        for emy in emys:
+            emy.interval = float('inf')
+            emy.image = pg.transform.laplacian(emy.image)
+        for bomb in bombs:
+            bomb.speed = 3
+            bomb.state = "inactive"
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (255, 255, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(50)
+        screen.blit(self.image, [0, 0])
+        pg.display.update()
+        time.sleep(0.5)
+
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -344,7 +370,7 @@ def main():
                     score.value -= 20
                     EMP(emys, bombs, screen)
             # 追加: 右Shiftキーで無敵モード発動
-            if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT and score.value >= 0:
+            if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT and score.value >= 100:
                 bird.state = "hyper"
                 bird.hyper_life = 500
                 score.value -= 100  # スコアを消費
@@ -385,6 +411,8 @@ def main():
             else:  #無敵状態での衝突
                 score.value += 1  # スコアアップ
                 bird.change_img(6,screen)  #  こうかとん喜びエフェクト
+                if bird.state == "hyper":
+                    bird.image = pg.transform.laplacian(bird.image)
 
         bird.update(key_lst, screen)
         beams.update()
